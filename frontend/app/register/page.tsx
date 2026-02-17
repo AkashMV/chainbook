@@ -23,7 +23,15 @@ export default function RegisterPage() {
 
       login(res.data.access_token);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed");
+      const detail = err.response?.data?.detail;
+
+      if (Array.isArray(detail)) {
+        setError(detail[0].msg);
+      } else if (typeof detail === "string") {
+        setError(detail);
+      } else {
+        setError("Registration failed. Please try again.");
+      }
     }
   };
 
