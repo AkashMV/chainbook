@@ -164,8 +164,8 @@ def create_wallet(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    new_wallet = Wallet.from_orm(wallet_data)
-    new_wallet.owner_id = current_user.id
+    wallet_dictionary = wallet_data.model_dump()
+    new_wallet = Wallet(**wallet_dictionary, owner_id=current_user.id)
     session.add(new_wallet)
     session.commit()
     session.refresh(new_wallet)
