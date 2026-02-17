@@ -2,17 +2,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from database import create_db, get_session
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
+from models import User, Wallet
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlmodel import Session, select
 from starlette.types import HTTPExceptionHandler
-
-from database import create_db, get_session
-from models import User, Wallet
 
 SECRET_KEY = "thisissecret"
 ALGORITHM = "HS256"
@@ -35,7 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], depreciated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -81,8 +80,16 @@ async def get_current_user(
 
 
 class UserCreate(BaseModel):
-    email: str
+    email: EmailStr
     password: str
+
+    @field_validator("password")
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Password must contain at least one number")
+        return v
 
 
 class WalletCreate(BaseModel):
@@ -100,7 +107,10 @@ class Token(BaseModel):
 
 @app.post("/register", response_model=Token)
 def register(user_data: UserCreate, session: Session = Depends(get_session)):
-    user_exists = session.exec(select(User).where(User.email == user_data.email))
+    user_exists = session.exec(
+        select(User).where(User.email == user_data.email)
+    ).first()
+    print(user_exists)
     if user_exists:
         raise HTTPException(
             status_code=400, detail="Account already exists with given email"
@@ -113,7 +123,7 @@ def register(user_data: UserCreate, session: Session = Depends(get_session)):
     session.refresh(new_user)
 
     access_token = create_token(data={"sub": new_user.email})
-    return {"access_token": access_token, "token_type": "beared"}
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.post("/token", response_model=Token)
